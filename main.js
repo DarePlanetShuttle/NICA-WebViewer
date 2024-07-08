@@ -745,7 +745,7 @@ async function main() {
     } catch (err) {}
 
     // Hardcode the loading of the local traje.splat file
-    const response = await fetch("traje.splat");
+    const response = await fetch("public/assets/open_space.splat");
     if (!response.ok) {
         throw new Error("Unable to load traje.splat");
     }
