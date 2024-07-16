@@ -743,15 +743,24 @@ async function main() {
         viewMatrix = JSON.parse(decodeURIComponent(location.hash.slice(1)));
         carousel = false;
     } catch (err) {}
-
-    // Hardcode the loading of the local traje.splat file
-    const response = await fetch("public/assets/open_space.splat");
-    if (!response.ok) {
-        throw new Error("Unable to load traje.splat");
-    }
-    const splatData = new Uint8Array(await response.arrayBuffer());
+    const url = new URL(
+        // "nike.splat",
+        // location.href,
+        params.get("url") || "open_space.splatst",
+        "https://dareplanetshuttle.github.io/NICA-WebViewer/public/assets/",
+    );
+    const req = await fetch(url, {
+        mode: "cors", // no-cors, *cors, same-origin
+        credentials: "omit", // include, *same-origin, omit
+    });
+    console.log(req);
+    if (req.status != 200)
+        throw new Error(req.status + " Unable to load " + req.url);
 
     const rowLength = 3 * 4 + 3 * 4 + 4 + 4;
+    const reader = req.body.getReader();
+    let splatData = new Uint8Array(req.headers.get("content-length"));
+
     const downsample =
         splatData.length / rowLength > 500000 ? 1 : 1 / devicePixelRatio;
     console.log(splatData.length / rowLength, downsample);
@@ -763,21 +772,6 @@ async function main() {
             }),
         ),
     );
-
-    if (
-        splatData[0] == 112 &&
-        splatData[1] == 108 &&
-        splatData[2] == 121 &&
-        splatData[3] == 10
-    ) {
-        // ply file magic header means it should be handled differently
-        worker.postMessage({ ply: splatData.buffer });
-    } else {
-        worker.postMessage({
-            buffer: splatData.buffer,
-            vertexCount: Math.floor(splatData.length / rowLength),
-        });
-    }
 
     const canvas = document.getElementById("canvas");
     const fps = document.getElementById("fps");
@@ -1423,6 +1417,31 @@ async function main() {
         e.stopPropagation();
         selectFile(e.dataTransfer.files[0]);
     });
+
+    let bytesRead = 0;
+    let lastVertexCount = -1;
+    let stopLoading = false;
+
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done || stopLoading) break;
+
+        splatData.set(value, bytesRead);
+        bytesRead += value.length;
+
+        if (vertexCount > lastVertexCount) {
+            worker.postMessage({
+                buffer: splatData.buffer,
+                vertexCount: Math.floor(bytesRead / rowLength),
+            });
+            lastVertexCount = vertexCount;
+        }
+    }
+    if (!stopLoading)
+        worker.postMessage({
+            buffer: splatData.buffer,
+            vertexCount: Math.floor(bytesRead / rowLength),
+        });
 }
 
 main().catch((err) => {
