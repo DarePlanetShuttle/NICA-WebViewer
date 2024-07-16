@@ -746,7 +746,7 @@ async function main() {
     const url = new URL(
         // "nike.splat",
         // location.href,
-        params.get("url") || "open_space.splatst",
+        params.get("url") || "open_space.splat",
         "https://dareplanetshuttle.github.io/NICA-WebViewer/public/assets/",
     );
     const req = await fetch(url, {
